@@ -20,7 +20,7 @@ data:
       "Storage": {
         "Path": "/data/files",
         "BaseUrl": "https://cdn.fetchitdata.cloud",
-        "ApiKey": "CHANGE_ME_GENERATE_A_REAL_KEY",
+        "ApiKey": "7929ed4bb527228d3d0121188a70490b7923311ae2e57d438e18e8aeca993b1e",
         "TtlMinutes": 60,
         "CleanupIntervalMinutes": 5
       }
