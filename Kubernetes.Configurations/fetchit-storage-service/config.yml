@@ -1,0 +1,140 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fetchit-storage-service
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-service-config
+  namespace: fetchit-storage-service
+data:
+  appsettings.json: |
+    {
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning"
+        }
+      },
+      "Storage": {
+        "Path": "/data/files",
+        "BaseUrl": "https://cdn.fetchitdata.cloud",
+        "ApiKey": "CHANGE_ME_GENERATE_A_REAL_KEY",
+        "TtlMinutes": 60,
+        "CleanupIntervalMinutes": 5
+      }
+    }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-service-pvc
+  namespace: fetchit-storage-service
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: managed-csi
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storage-service
+  namespace: fetchit-storage-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: storage-service
+  template:
+    metadata:
+      labels:
+        app: storage-service
+    spec:
+      containers:
+        - name: storage-service
+          image: schultzregistry.azurecr.io/fetchit-storage-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+            - name: file-storage
+              mountPath: /data/files
+      volumes:
+        - name: config-volume
+          configMap:
+            name: storage-service-config
+        - name: file-storage
+          persistentVolumeClaim:
+            claimName: storage-service-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storage-service
+  namespace: fetchit-storage-service
+spec:
+  selector:
+    app: storage-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@fetchitdata.cloud
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: storage-service-ingress
+  namespace: fetchit-storage-service
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - cdn.fetchitdata.cloud
+      secretName: cdn-fetchitdata-tls
+  rules:
+    - host: cdn.fetchitdata.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: storage-service
+                port:
+                  number: 80
