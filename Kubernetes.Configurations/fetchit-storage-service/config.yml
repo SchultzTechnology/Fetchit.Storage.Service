@@ -21,8 +21,8 @@ data:
         "Path": "/data/files",
         "BaseUrl": "https://cdn.fetchitdata.cloud",
         "ApiKey": "7929ed4bb527228d3d0121188a70490b7923311ae2e57d438e18e8aeca993b1e",
-        "TtlMinutes": 60,
-        "CleanupIntervalMinutes": 5
+        "TtlMinutes": 10080,
+        "CleanupIntervalMinutes": 60
       }
     }
 ---
